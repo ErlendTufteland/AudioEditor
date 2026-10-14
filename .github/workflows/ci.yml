@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # The release workflow runs this first.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # A newer push to a pull request replaces the older run; every commit on main gets its own.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      # Windows Server leaves out Media Foundation, which holds the FLAC, MP3 and AAC encoders.
+      # Without it the tests for those formats are skipped, and the job summary says so.
+      - name: Install Media Foundation
+        continue-on-error: true
+        shell: powershell
+        run: |
+          if (-not (Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue)) {
+              'Not Windows Server: Media Foundation comes with Windows.'; exit 0
+          }
+          $feature = Get-WindowsFeature -Name Server-Media-Foundation
+          if ($feature.Installed) { 'Media Foundation is already installed.'; exit 0 }
+          Install-WindowsFeature -Name Server-Media-Foundation | Format-List Success, RestartNeeded, ExitCode
+
+      # The build has no warnings; keep it that way.
+      - name: Build
+        run: dotnet build AudioEditor.slnx --configuration Release -warnaserror
+
+      - name: Test
+        id: test
+        run: dotnet test AudioEditor.slnx --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: List the encoders the tests could use
+        if: steps.test.outcome == 'success' || steps.test.outcome == 'failure'
+        shell: pwsh
+        run: |
+          $lines = dotnet test tests/AudioEditor.Core.Tests --configuration Release --no-build `
+              --filter "FullyQualifiedName~Lists_the_encoders_on_this_machine" --logger "console;verbosity=detailed" |
+            Select-String -Pattern '^\s*(Wav16|Wav24|WavFloat|Flac|Mp3|Aac): ' |
+            ForEach-Object { $_.Line.Trim() }
+          $lines
+          '### Encoders on this runner' >> $env:GITHUB_STEP_SUMMARY
+          $lines | ForEach-Object { "- $_" } >> $env:GITHUB_STEP_SUMMARY

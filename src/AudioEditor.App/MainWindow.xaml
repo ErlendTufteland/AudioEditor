@@ -1,0 +1,494 @@
+<Window x:Class="AudioEditor.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:AudioEditor.App.Controls"
+        xmlns:vm="clr-namespace:AudioEditor.App.ViewModels"
+        x:Name="Root"
+        Title="{Binding WindowTitle, FallbackValue='Audio Editor'}"
+        Width="1280" Height="800" MinWidth="860" MinHeight="580"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True"
+        PreviewKeyDown="OnPreviewKeyDown"
+        PreviewMouseDown="OnWindowPreviewMouseDown"
+        DragOver="OnWindowDragOver"
+        Drop="OnWindowDrop"
+        Closing="OnClosing"
+        Closed="OnClosed">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="210" MinHeight="140" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="250" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Padding="12,10" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}">
+            <DockPanel LastChildFill="False">
+                <Button DockPanel.Dock="Right" Command="{Binding ExportCommand}" AutomationProperties.Name="Export" Style="{DynamicResource AccentButtonStyle}"
+                        ToolTip="Render the timeline to a new audio file (Ctrl+E)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xEDE1;" />
+                        <TextBlock Style="{StaticResource ButtonLabel}" Text="Export…" />
+                    </StackPanel>
+                </Button>
+
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Button x:Name="FileMenuButton" AutomationProperties.Name="File" Margin="0,0,6,0" Click="OnFileMenuClick"
+                            ToolTip="New, open and save projects (Alt+F)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8A5;" />
+                            <AccessText Margin="8,0,0,0" VerticalAlignment="Center" Text="_File"
+                                        Visibility="{Binding IsToolbarCompact, ElementName=Root, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <TextBlock Style="{StaticResource Icon}" Margin="8,0,0,0" FontSize="10" Text="&#xE70D;" />
+                        </StackPanel>
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="_New project" Command="{Binding NewProjectCommand}" InputGestureText="Ctrl+N">
+                                    <MenuItem.Icon>
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8A5;" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="_Open project…" Command="{Binding OpenProjectCommand}" InputGestureText="Ctrl+Shift+O">
+                                    <MenuItem.Icon>
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8E5;" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Open _recent" ItemsSource="{Binding RecentProjects}" IsEnabled="{Binding HasRecentProjects}">
+                                    <MenuItem.Icon>
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE81C;" />
+                                    </MenuItem.Icon>
+                                    <MenuItem.ItemContainerStyle>
+                                        <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                            <Setter Property="Header" Value="{Binding}" />
+                                            <!-- TextBlocks, so an underscore in a file name isn't taken for an access key. -->
+                                            <Setter Property="HeaderTemplate">
+                                                <Setter.Value>
+                                                    <DataTemplate DataType="{x:Type vm:RecentProjectViewModel}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Name}" />
+                                                            <TextBlock Margin="12,0,0,0" MaxWidth="260" TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Folder}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                                            <Setter Property="ToolTip" Value="{Binding Path}" />
+                                            <Setter Property="Command" Value="{Binding OpenCommand}" />
+                                        </Style>
+                                    </MenuItem.ItemContainerStyle>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="_Save" Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S">
+                                    <MenuItem.Icon>
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE74E;" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Save _as…" Command="{Binding SaveProjectAsCommand}" InputGestureText="Ctrl+Shift+S">
+                                    <MenuItem.Icon>
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE792;" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                    <Border Style="{StaticResource Separator}" />
+                    <Button Command="{Binding AddFilesCommand}" AutomationProperties.Name="Add files" Margin="0,0,6,0" ToolTip="Add audio files to the end of the timeline (Ctrl+O)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" />
+                            <TextBlock Style="{StaticResource ButtonLabel}" Text="Add files"
+                                       Visibility="{Binding IsToolbarCompact, ElementName=Root, Converter={StaticResource InverseBoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding RemoveClipCommand}" AutomationProperties.Name="Remove" Margin="0,0,6,0" ToolTip="Remove the selected clip (Delete)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" />
+                            <TextBlock Style="{StaticResource ButtonLabel}" Text="Remove"
+                                       Visibility="{Binding IsToolbarCompact, ElementName=Root, Converter={StaticResource InverseBoolToVisibility}}" />
+                        </StackPanel>
+                    </Button>
+                    <Border Style="{StaticResource Separator}" />
+                    <Button Command="{Binding MoveLeftCommand}" AutomationProperties.Name="Move left" Margin="0,0,6,0" ToolTip="Move the selected clip earlier (Ctrl+Left)">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE76B;" />
+                    </Button>
+                    <Button Command="{Binding MoveRightCommand}" AutomationProperties.Name="Move right" Margin="0,0,6,0" ToolTip="Move the selected clip later (Ctrl+Right)">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" />
+                    </Button>
+                    <Border Style="{StaticResource Separator}" />
+                    <Button Command="{Binding GoToStartCommand}" AutomationProperties.Name="Go to start" Margin="0,0,6,0" ToolTip="Go to the start (Home)">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE892;" />
+                    </Button>
+                    <Button Command="{Binding PlayPauseCommand}" AutomationProperties.Name="{Binding PlayText}" Margin="0,0,6,0" MinWidth="96" ToolTip="Play or pause the timeline (Space)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="{Binding PlayGlyph}" />
+                            <TextBlock Style="{StaticResource ButtonLabel}" Text="{Binding PlayText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding StopCommand}" AutomationProperties.Name="Stop" Margin="0,0,6,0" ToolTip="Stop and return to where playback started (Esc)">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE71A;" />
+                    </Button>
+                    <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}" FontSize="15" AutomationProperties.AutomationId="Position"
+                               Text="{Binding PositionText}" />
+                    <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}" FontSize="15" AutomationProperties.AutomationId="BarBeat"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" ToolTip="The playhead as bar and beat"
+                               Visibility="{Binding BeatGrid.IsEnabled, Converter={StaticResource BoolToVisibility}}"
+                               Text="{Binding BeatGrid.PositionText}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Timeline header -->
+        <DockPanel Grid.Row="1" Margin="12,10,12,6">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Command="{Binding ZoomOutCommand}" AutomationProperties.Name="Zoom timeline out" Margin="0,0,6,0" ToolTip="Zoom out (Ctrl+scroll)">
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE71F;" />
+                </Button>
+                <Button Command="{Binding ZoomInCommand}" AutomationProperties.Name="Zoom timeline in" Margin="0,0,6,0" ToolTip="Zoom in (Ctrl+scroll)">
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE8A3;" />
+                </Button>
+                <Button Command="{Binding ZoomFitCommand}" Content="Fit" ToolTip="Fit the whole timeline in the window" />
+            </StackPanel>
+
+            <!-- Beat grid -->
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <ToggleButton IsChecked="{Binding BeatGrid.IsEnabled}" AutomationProperties.Name="Beat grid" Margin="0,0,6,0"
+                              ToolTip="Show the beat grid and snap the cursor, trim handles and playhead to it (G). Hold Alt while dragging to place freely.">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE80A;" />
+                        <TextBlock Style="{StaticResource ButtonLabel}" Text="Grid" />
+                    </StackPanel>
+                </ToggleButton>
+                <!-- In a narrow window, Snap to and the + button move into the Tempo popup (IsHeaderCompact). -->
+                <StackPanel Orientation="Horizontal" Visibility="{Binding BeatGrid.IsEnabled, Converter={StaticResource BoolToVisibility}}">
+                    <ComboBox Width="92" Margin="0,0,10,0" AutomationProperties.Name="Snap to" ToolTip="What dragging snaps to"
+                              Visibility="{Binding IsHeaderCompact, ElementName=Root, Converter={StaticResource InverseBoolToVisibility}}"
+                              ItemsSource="{Binding BeatGrid.Resolutions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                              SelectedValue="{Binding BeatGrid.Resolution}" />
+                    <TextBox Width="84" controls:TextBoxCommit.IsEnabled="True" AutomationProperties.Name="Tempo"
+                             ToolTip="Tempo at the playhead, in beats per minute. Changing it changes the tempo of the whole section the playhead is in. Up and Down change it by 1."
+                             PreviewKeyDown="OnTempoBoxPreviewKeyDown"
+                             Text="{Binding BeatGrid.CurrentBpm, Converter={StaticResource NumberText}, UpdateSourceTrigger=Explicit}" />
+                    <StackPanel Margin="2,0,0,0" VerticalAlignment="Center">
+                        <RepeatButton Style="{StaticResource SpinButton}" Margin="0,0,0,2" Command="{Binding BeatGrid.IncreaseBpmCommand}"
+                                      AutomationProperties.Name="Increase tempo" ToolTip="1 BPM faster (Up)">
+                            <TextBlock Style="{StaticResource Icon}" FontSize="8" Text="&#xE70E;" />
+                        </RepeatButton>
+                        <RepeatButton Style="{StaticResource SpinButton}" Command="{Binding BeatGrid.DecreaseBpmCommand}"
+                                      AutomationProperties.Name="Decrease tempo" ToolTip="1 BPM slower (Down)">
+                            <TextBlock Style="{StaticResource Icon}" FontSize="8" Text="&#xE70D;" />
+                        </RepeatButton>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="6,0,0,0" Text="BPM" />
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="6,0,0,0" Text="{Binding BeatGrid.CurrentSectionText}" />
+                    <Button Command="{Binding AddTempoChangeCommand}" AutomationProperties.Name="Add tempo change" Margin="4,0,0,0"
+                            Visibility="{Binding IsHeaderCompact, ElementName=Root, Converter={StaticResource InverseBoolToVisibility}}"
+                            ToolTip="Let the tempo change at the bar nearest the playhead">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" />
+                    </Button>
+                    <ToggleButton x:Name="TempoMapButton" AutomationProperties.Name="Tempo map" Margin="6,0,0,0"
+                                  IsHitTestVisible="{Binding IsOpen, ElementName=TempoMapPopup, Converter={StaticResource InverseBool}}"
+                                  ToolTip="Tempo map: all tempo changes, beats per bar and where bar 1 starts">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE916;" />
+                            <TextBlock Style="{StaticResource ButtonLabel}" Text="Tempo" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <Popup x:Name="TempoMapPopup" PlacementTarget="{Binding ElementName=TempoMapButton}" Placement="Custom"
+                           VerticalOffset="4" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
+                           IsOpen="{Binding IsChecked, ElementName=TempoMapButton, Mode=TwoWay}">
+                        <Border Margin="10,0,10,10" Padding="16,14" CornerRadius="8" BorderThickness="1"
+                                Background="{DynamicResource SolidBackgroundFillColorQuarternaryBrush}"
+                                BorderBrush="{DynamicResource SurfaceStrokeColorFlyoutBrush}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" />
+                            </Border.Effect>
+                            <StackPanel Width="340">
+                                <TextBlock Text="Tempo map" FontSize="14" FontWeight="SemiBold" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
+                                            Visibility="{Binding IsHeaderCompact, ElementName=Root, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Snap to" />
+                                    <ComboBox Width="92" AutomationProperties.Name="Snap to" ToolTip="What dragging snaps to"
+                                              ItemsSource="{Binding BeatGrid.Resolutions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                                              SelectedValue="{Binding BeatGrid.Resolution}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Beats per bar" />
+                                    <TextBox Width="64" controls:TextBoxCommit.IsEnabled="True" AutomationProperties.Name="Beats per bar"
+                                             Text="{Binding BeatGrid.BeatsPerBar, Converter={StaticResource NumberText}, UpdateSourceTrigger=Explicit}" />
+                                    <TextBlock Style="{StaticResource FieldLabel}" Margin="16,0,6,0" Text="Bar 1 at" />
+                                    <TextBox Width="100" FontFamily="{StaticResource MonoFont}" controls:TextBoxCommit.IsEnabled="True"
+                                             AutomationProperties.Name="Bar 1 at" ToolTip="Where on the timeline bar 1 starts, as m:ss.fff"
+                                             Text="{Binding BeatGrid.Offset, Converter={StaticResource TimeText}, UpdateSourceTrigger=Explicit}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Metronome volume" />
+                                    <Slider Width="140" VerticalAlignment="Center" Minimum="0" Maximum="1" SmallChange="0.05" LargeChange="0.1"
+                                            AutomationProperties.Name="Metronome volume" Value="{Binding BeatGrid.MetronomeVolume}" />
+                                    <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding BeatGrid.MetronomeVolumeText}" />
+                                </StackPanel>
+
+                                <TextBlock Margin="0,16,0,8" Text="Tempo changes" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <ItemsControl ItemsSource="{Binding BeatGrid.Changes}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:TempoChangeViewModel}">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                <TextBlock Style="{StaticResource FieldLabel}" Width="28" Text="Bar" />
+                                                <TextBox Width="68" controls:TextBoxCommit.IsEnabled="True" AutomationProperties.Name="Bar"
+                                                         IsEnabled="{Binding IsMovable}" ToolTip="The bar the tempo starts at"
+                                                         Text="{Binding Bar, Converter={StaticResource NumberText}, UpdateSourceTrigger=Explicit}" />
+                                                <TextBox Width="84" Margin="12,0,6,0" controls:TextBoxCommit.IsEnabled="True" AutomationProperties.Name="Tempo"
+                                                         Text="{Binding Bpm, Converter={StaticResource NumberText}, UpdateSourceTrigger=Explicit}" />
+                                                <TextBlock Style="{StaticResource FieldLabel}" Text="BPM" />
+                                                <Button Margin="10,0,0,0" Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove tempo change"
+                                                        Visibility="{Binding IsMovable, Converter={StaticResource BoolToVisibility}}"
+                                                        ToolTip="Remove this tempo change">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" />
+                                                </Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button Margin="0,4,0,0" Command="{Binding AddTempoChangeCommand}" HorizontalAlignment="Left">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" />
+                                        <TextBlock Style="{StaticResource ButtonLabel}" Text="Add at playhead" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Margin="0,12,0,0" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Each tempo lasts from the start of its bar until the next change. The BPM box in the timeline header changes the tempo where the playhead is." />
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                    <ToggleButton Margin="4,0,0,0" IsChecked="{Binding BeatGrid.IsMetronomeOn}" AutomationProperties.Name="Metronome"
+                                  ToolTip="Metronome: click on every beat while playing (M). Set its volume under Tempo. It is never exported.">
+                        <!-- A metronome: tapered body, base and pendulum. -->
+                        <Path Width="16" Height="16" StrokeThickness="1" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Stroke="{Binding (TextElement.Foreground), RelativeSource={RelativeSource Self}}"
+                              Data="M6.2,1.5 H9.8 L13,14.5 H3 Z M3.75,11.5 H12.25 M8,11.5 L11.5,3.5" />
+                    </ToggleButton>
+                </StackPanel>
+                <Border Style="{StaticResource Separator}" />
+            </StackPanel>
+
+            <TextBlock Text="Timeline" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" Text="{Binding ClipCountText}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                       Text="Clips play left to right. Drag to reorder, click to place the playhead." />
+        </DockPanel>
+
+        <!-- Timeline -->
+        <Border Grid.Row="2" Margin="12,0" CornerRadius="8" Background="{StaticResource TimelineBackgroundBrush}"
+                AllowDrop="True" DragOver="OnTimelineDragOver" DragLeave="OnTimelineDragLeave" Drop="OnTimelineDrop">
+            <Grid>
+                <ListBox x:Name="TimelineList" AutomationProperties.Name="Timeline"
+                         ItemsSource="{Binding Clips}"
+                         SelectedItem="{Binding SelectedClip}"
+                         ItemContainerStyle="{StaticResource TimelineItem}"
+                         Background="Transparent" BorderThickness="0" Padding="6"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                         PreviewMouseLeftButtonDown="OnTimelineMouseDown"
+                         PreviewMouseMove="OnTimelineMouseMove"
+                         PreviewMouseLeftButtonUp="OnTimelineMouseUp"
+                         PreviewMouseDown="OnTimelinePanStart"
+                         PreviewMouseUp="OnTimelinePanEnd"
+                         LostMouseCapture="OnTimelineLostMouseCapture"
+                         PreviewMouseWheel="OnTimelineMouseWheel"
+                         SizeChanged="OnTimelineSizeChanged">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ClipViewModel}">
+                            <Border Width="{Binding BlockWidth}" CornerRadius="6" Background="{StaticResource ClipBackgroundBrush}"
+                                    ToolTip="{Binding FilePath}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Margin="8,6,8,4" Text="{Binding FileName}" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{StaticResource ClipTextBrush}" TextTrimming="CharacterEllipsis" />
+                                    <controls:WaveformView Grid.Row="1" IsEditable="False" IsHitTestVisible="False"
+                                                           Peaks="{Binding Peaks}"
+                                                           Duration="{Binding Duration}"
+                                                           TrimStart="{Binding TrimStart, Mode=OneWay}"
+                                                           TrimEnd="{Binding TrimEnd, Mode=OneWay}"
+                                                           Position="{Binding TimelinePlayhead, Mode=OneWay}"
+                                                           FadeIn="{Binding FadeIn}"
+                                                           FadeOut="{Binding FadeOut}"
+                                                           Gain="{Binding GainLinear}"
+                                                           Grid="{Binding DataContext.BeatGrid.ActiveMap, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                           TimelineOrigin="{Binding TimelineOrigin}" />
+                                    <ProgressBar Grid.Row="1" Margin="12,0" VerticalAlignment="Center" Maximum="1"
+                                                 Value="{Binding LoadProgress, Mode=OneWay}"
+                                                 Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+                                    <DockPanel Grid.Row="2" Margin="8,4,8,6">
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding LengthText}" FontSize="11"
+                                                   FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource ClipSubtleTextBrush}" />
+                                        <TextBlock Text="{Binding GainBadge}" FontSize="11" Foreground="{StaticResource ClipSubtleTextBrush}" />
+                                    </DockPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
+                            Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock HorizontalAlignment="Center" Style="{StaticResource Icon}" FontSize="32" Text="&#xE8D6;"
+                               Foreground="{StaticResource ClipSubtleTextBrush}" />
+                    <TextBlock Margin="0,10,0,0" HorizontalAlignment="Center" FontSize="15" Foreground="{StaticResource ClipSubtleTextBrush}"
+                               Text="Drop audio files here, or click Add files" />
+                    <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" FontSize="12" Foreground="{StaticResource ClipSubtleTextBrush}"
+                               Text="WAV, MP3, FLAC, M4A/AAC, WMA and AIFF" />
+                </StackPanel>
+
+                <Canvas IsHitTestVisible="False">
+                    <Rectangle x:Name="InsertionMarker" Width="3" RadiusX="1.5" RadiusY="1.5" Visibility="Collapsed"
+                               Fill="{StaticResource SelectionBrush}" />
+                </Canvas>
+            </Grid>
+        </Border>
+
+        <GridSplitter Grid.Row="3" Height="8" HorizontalAlignment="Stretch" Background="Transparent"
+                      ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" />
+
+        <!-- Clip editor -->
+        <Grid Grid.Row="4" Margin="12,0,12,10">
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="15"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       Visibility="{Binding HasNoSelection, Converter={StaticResource BoolToVisibility}}"
+                       Text="Select a clip in the timeline to trim it." />
+
+            <Grid Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Margin="0,0,0,8">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <Button Click="OnEditorZoomOut" AutomationProperties.Name="Zoom clip out" Margin="0,0,6,0" ToolTip="Zoom out (scroll)">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE71F;" />
+                        </Button>
+                        <Button Click="OnEditorZoomIn" AutomationProperties.Name="Zoom clip in" Margin="0,0,6,0" ToolTip="Zoom in (scroll)">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8A3;" />
+                        </Button>
+                        <Button Click="OnEditorZoomToTrim" Margin="0,0,6,0" Content="Zoom to clip" ToolTip="Show the part that is kept" />
+                        <Button Click="OnEditorZoomFit" Content="Whole file" ToolTip="Show the whole source file" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="{Binding SelectedClip.FileName}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Margin="0,2,0,0" Text="{Binding SelectedClip.Description}" TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </DockPanel>
+
+                <Border Grid.Row="1" CornerRadius="8" ClipToBounds="True" Background="#161A1F">
+                    <controls:WaveformView x:Name="EditorWave" IsEditable="True"
+                                           Peaks="{Binding SelectedClip.Peaks}"
+                                           Duration="{Binding SelectedClip.Duration}"
+                                           TrimStart="{Binding SelectedClip.TrimStart}"
+                                           TrimEnd="{Binding SelectedClip.TrimEnd}"
+                                           Position="{Binding SelectedClip.EditorPosition}"
+                                           FadeIn="{Binding SelectedClip.FadeIn}"
+                                           FadeOut="{Binding SelectedClip.FadeOut}"
+                                           Gain="{Binding SelectedClip.GainLinear}"
+                                           Grid="{Binding BeatGrid.ActiveMap}"
+                                           TimelineOrigin="{Binding SelectedClip.TimelineOrigin}"
+                                           SnapStep="{Binding BeatGrid.SnapStep}" />
+                </Border>
+
+                <WrapPanel Grid.Row="2" Margin="0,10,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,28,6">
+                        <Button Command="{Binding PreviewCommand}" AutomationProperties.Name="{Binding PreviewText}" Margin="0,0,6,0" MinWidth="170"
+                                ToolTip="Play the whole source file from the cursor, including the parts trimmed away (Shift+Space)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="{Binding PreviewGlyph}" />
+                                <TextBlock Style="{StaticResource ButtonLabel}" Text="{Binding PreviewText}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding SetTrimStartCommand}" AutomationProperties.Name="Set start" Margin="0,0,6,0" ToolTip="Start the clip at the cursor (I)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE892;" Foreground="#66BB6A" />
+                                <TextBlock Style="{StaticResource ButtonLabel}" Text="Set start" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding SetTrimEndCommand}" AutomationProperties.Name="Set end" Margin="0,0,6,0" ToolTip="End the clip at the cursor (O)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource ButtonLabel}" Margin="0,0,8,0" Text="Set end" />
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE893;" Foreground="#EF5350" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ResetTrimCommand}" Content="Reset trim" ToolTip="Use the whole file again" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,28,6">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Start" />
+                        <TextBox Width="104" FontFamily="{StaticResource MonoFont}" controls:TextBoxCommit.IsEnabled="True"
+                                 AutomationProperties.Name="Start" ToolTip="Where the clip starts in the file, as m:ss.fff"
+                                 Text="{Binding SelectedClip.TrimStart, Converter={StaticResource TimeText}, UpdateSourceTrigger=Explicit}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="12,0,6,0" Text="End" />
+                        <TextBox Width="104" FontFamily="{StaticResource MonoFont}" controls:TextBoxCommit.IsEnabled="True"
+                                 AutomationProperties.Name="End" ToolTip="Where the clip ends in the file, as m:ss.fff"
+                                 Text="{Binding SelectedClip.TrimEnd, Converter={StaticResource TimeText}, UpdateSourceTrigger=Explicit}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="12,0,6,0" Text="Length" />
+                        <TextBlock VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}" Text="{Binding SelectedClip.LengthText}" AutomationProperties.AutomationId="ClipLength" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,28,6">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Fade in" />
+                        <TextBox Width="64" controls:TextBoxCommit.IsEnabled="True" AutomationProperties.Name="Fade in" ToolTip="Fade in, in seconds"
+                                 Text="{Binding SelectedClip.FadeIn, Converter={StaticResource SecondsText}, UpdateSourceTrigger=Explicit}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="12,0,6,0" Text="Fade out" />
+                        <TextBox Width="64" controls:TextBoxCommit.IsEnabled="True" AutomationProperties.Name="Fade out" ToolTip="Fade out, in seconds"
+                                 Text="{Binding SelectedClip.FadeOut, Converter={StaticResource SecondsText}, UpdateSourceTrigger=Explicit}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="6,0,0,0" Text="s" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,28,6">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Volume" />
+                        <Slider Width="160" AutomationProperties.Name="Volume" VerticalAlignment="Center" Minimum="-30" Maximum="12"
+                                SmallChange="0.5" LargeChange="3" TickFrequency="0.5" IsSnapToTickEnabled="True"
+                                ToolTip="Volume change for this clip. Double-click to reset."
+                                MouseDoubleClick="OnGainDoubleClick"
+                                Value="{Binding SelectedClip.GainDb}" />
+                        <TextBlock Width="64" Margin="8,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}"
+                                   Text="{Binding SelectedClip.GainText}" />
+                    </StackPanel>
+                </WrapPanel>
+
+                <TextBlock Grid.Row="3" Margin="0,4,0,0" FontSize="12" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                           Text="Drag the green and red handles to trim. Click to move the cursor, scroll to zoom. Pan with Shift+scroll, the thumb wheel or by dragging with the middle button. Space plays the timeline, Shift+Space previews the file, I and O set start and end at the cursor. With the beat grid on, dragging snaps to it; hold Alt to drag freely." />
+            </Grid>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="5" Padding="12,6" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsExporting, Converter={StaticResource BoolToVisibility}}">
+                        <ProgressBar Width="220" VerticalAlignment="Center" Maximum="1" Value="{Binding ExportProgress, Mode=OneWay}" />
+                        <TextBlock Width="44" Margin="8,0" VerticalAlignment="Center" Text="{Binding ExportProgressText}" />
+                        <Button Command="{Binding CancelExportCommand}" Content="Cancel" />
+                    </StackPanel>
+                    <Button Margin="8,0,0,0" Command="{Binding ShowExportedFileCommand}" Content="Show in folder"
+                            Visibility="{Binding HasExportedFile, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+                <TextBlock VerticalAlignment="Center" Text="{Binding StatusText}" AutomationProperties.AutomationId="Status" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

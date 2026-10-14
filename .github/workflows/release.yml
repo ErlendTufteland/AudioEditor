@@ -1,0 +1,61 @@
+name: Release
+
+# Push a tag such as v0.1.0 to build, test and publish a release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Publish and release
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      # One self-contained AudioEditor.exe: nothing to install, not even .NET.
+      - name: Publish
+        shell: pwsh
+        run: |
+          if ($env:TAG -notmatch '^v(\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?)$') {
+              throw "The tag $env:TAG is not a version such as v1.2.3 or v1.2.3-beta.1."
+          }
+          $version = $Matches[1]
+          dotnet publish src/AudioEditor.App --configuration Release --runtime win-x64 --self-contained `
+              -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+              -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:Version=$version --output publish
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+          Copy-Item LICENSE, THIRD-PARTY-NOTICES.txt publish
+          $zip = "AudioEditor-$version-win-x64.zip"
+          Compress-Archive -Path publish/* -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path "$zip.sha256" -Value "$hash  $zip" -Encoding ascii
+          "$hash  $zip"
+
+          "VERSION=$version" >> $env:GITHUB_ENV
+          "ZIP=$zip" >> $env:GITHUB_ENV
+
+      - name: Create the release
+        shell: pwsh
+        run: |
+          $options = @('--title', "Audio Editor $env:VERSION", '--generate-notes')
+          # 0.x versions, and versions such as 1.0.0-beta.1, are marked as pre-releases.
+          if ($env:VERSION -match '^0\.|-') { $options += '--prerelease' }
+          gh release create $env:TAG $env:ZIP "$env:ZIP.sha256" @options

@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>AudioEditor</AssemblyName>
+    <RootNamespace>AudioEditor.App</RootNamespace>
+    <Product>Audio Editor</Product>
+    <!-- Made by tools/make-icon.cs. -->
+    <ApplicationIcon>Assets\AudioEditor.ico</ApplicationIcon>
+    <!-- Application.ThemeMode (Fluent theme) is marked experimental. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AudioEditor.Core\AudioEditor.Core.csproj" />
+  </ItemGroup>
+
+</Project>
