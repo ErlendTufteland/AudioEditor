@@ -5,6 +5,8 @@
 A small Windows audio editor: put several audio files one after another, trim each one, and
 export the result as a new file.
 
+![Audio Editor with four clips on the timeline, the beat grid on, and one clip open in the clip editor with its start and end trimmed](docs/screenshot.png)
+
 ## Download
 
 Download `AudioEditor-<version>-win-x64.zip` from
